@@ -1,0 +1,52 @@
+[project]
+name = "analyse-f1"
+description = "Using `fastf1` to analyse and visualise Formula One races."
+readme = "README.md"
+authors = [
+    { name = "Heuristic Pedals", email = "heuristicpedals@gmail.com" }
+]
+dynamic = ["version"]
+requires-python = ">=3.13"
+dependencies = [
+    "fastf1==3.5.3",
+]
+
+[project.scripts]
+analyse-f1 = "analyse_f1.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/analyse_f1/__init__.py"
+
+[dependency-groups]
+dev = [
+    "pre-commit==4.2.0",
+    "ruff==0.11.6",
+]
+
+[tool.ruff]
+line-length = 79
+
+[tool.ruff.lint]
+extend-select = ["D", "I", "W", "F", "C", "S", "N"]
+ignore = ["D105"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["assumpdoc"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "S101", # asserts allowed in tests
+]
+
+[tool.coverage.run]
+source = ["./src"]
+
+[tool.pytest.ini_options]
+testpaths = ["./tests"]
