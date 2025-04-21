@@ -4,18 +4,18 @@ on: [push, pull_request]
 
 jobs:
 
-  build:
-    name: Build
+  pre-commit:
+    name: Pre-commit
     timeout-minutes: 5
     runs-on: ${{ matrix.os }}
     strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        matrix:
+          os: [ubuntu-latest]
+          python-version: ["3.13"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Install uv and python ${{ matrix.python-version }}
+      - name: Install uv and Python ${{ matrix.python-version }}
         uses: astral-sh/setup-uv@v5
         with:
           version: "0.6.14"
@@ -24,5 +24,52 @@ jobs:
           cache-dependency-glob: "uv.lock"
       - name: Install the project
         run: uv sync --all-extras --dev
+      - name: Run project pre-commits
+        run: uv run pre-commit run --all-files
+
+  tests:
+    name: Tests
+    timeout-minutes: 5
+    runs-on: ${{ matrix.os }}
+    strategy:
+        matrix:
+          os: [ubuntu-latest]
+          python-version: ["3.13"]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install uv and Python ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.6.14"
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - name: Install the project
+        run: uv sync --all-extras --dev
+      - name: Run project pre-commits
+        run: uv run pytest --cov --cov-report=xml
+
+  build:
+    name: Build
+    timeout-minutes: 5
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.13"]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install uv and Python ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.6.14"
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - name: Install the project
+        # only install the main project dependencies
+        run: uv sync --no-dev
       - name: Build project
         run: uv build
