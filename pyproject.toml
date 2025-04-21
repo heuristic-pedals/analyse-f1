@@ -6,7 +6,7 @@ authors = [
     { name = "Heuristic Pedals", email = "heuristicpedals@gmail.com" }
 ]
 dynamic = ["version"]
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 dependencies = [
     "fastf1==3.5.3",
 ]
