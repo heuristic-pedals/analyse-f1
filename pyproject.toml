@@ -25,6 +25,7 @@ path = "src/analyse_f1/__init__.py"
 [dependency-groups]
 dev = [
     "hypothesis==6.131.6",
+    "ipykernel>=6.29.5",
     "mockito==1.5.4",
     "pre-commit==4.2.0",
     "pytest==8.3.5",
