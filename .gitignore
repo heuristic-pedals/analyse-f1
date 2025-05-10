@@ -170,3 +170,6 @@ _site/
 objects.json
 docs/*
 !docs/_static
+
+# dev folder
+dev/
