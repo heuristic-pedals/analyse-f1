@@ -26,6 +26,7 @@ path = "src/analyse_f1/__init__.py"
 dev = [
     "hypothesis==6.131.6",
     "ipykernel>=6.29.5",
+    "kaleido==0.2.1",
     "mockito==1.5.4",
     "nbformat>=4.2.0",
     "pre-commit==4.2.0",
