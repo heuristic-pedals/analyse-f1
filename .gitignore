@@ -173,3 +173,11 @@ docs/*
 
 # dev folder
 dev/
+
+# notebooks directory
+notebooks/*
+!notebooks/*.py
+
+# outputs directory
+outputs/*
+!outputs/.gitkeep
