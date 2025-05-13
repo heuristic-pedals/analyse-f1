@@ -6,6 +6,8 @@ only, so comments and docstrings are initially minimal.
 """
 
 # %%
+import datetime
+
 import fastf1 as ff1
 import numpy as np
 import pandas as pd
@@ -303,7 +305,7 @@ fig.add_annotation(
 fig.add_annotation(
     text=(
         "Sources: F1 API/FastF1 v3.5.3 (collection), "
-        "Heuristic Pedals (analysis and visualisation)."
+        "Grid Graphs (analysis and visualisation)."
     ),
     x=0,
     y=-0.21,
@@ -471,7 +473,7 @@ fig.add_annotation(
 fig.add_annotation(
     text=(
         "Sources: F1 API/FastF1 v3.5.3 (collection), "
-        "Heuristic Pedals (analysis and visualisation)."
+        "Grid Graphs (analysis and visualisation)."
     ),
     x=0,
     y=-0.21,
@@ -645,7 +647,7 @@ fig.add_annotation(
 fig.add_annotation(
     text=(
         "Sources: F1 API/FastF1 v3.5.3 (collection), "
-        "Heuristic Pedals (visualisation)."
+        "Grid Graphs (visualisation)."
     ),
     x=0,
     y=-0.21,
@@ -836,8 +838,8 @@ fig.add_annotation(
         f"<b>Sector 2</b><br>{sector_times.Driver.iloc[1]}: "
         f"{sector_times['Time (s)'].iloc[1]:.3f}s"
     ),
-    x=8600,
-    y=-4500,
+    x=8500,
+    y=-4400,
     align="center",
     showarrow=False,
     font=dict(color="#FF8000", size=14),  # noqa: C408
@@ -849,7 +851,7 @@ fig.add_annotation(
         f"{sector_times['Time (s)'].iloc[2]:.3f}s"
     ),
     x=3300,
-    y=1900,
+    y=1700,
     align="center",
     showarrow=False,
     font=dict(color="#0093DD", size=14),  # noqa: C408
@@ -858,7 +860,7 @@ fig.add_annotation(
 fig.add_annotation(
     text=(
         "Sources: F1 API/FastF1 v3.5.3 (collection), "
-        "Heuristic Pedals (analysis and visualisation)."
+        "Grid Graphs (analysis and visualisation)."
     ),
     x=0,
     y=-0.1,
@@ -971,7 +973,7 @@ fig.add_annotation(
 fig.add_annotation(
     text=(
         "Sources: F1 API/FastF1 v3.5.3 (collection), "
-        "Heuristic Pedals (analysis and visualisation)."
+        "Grid Graphs (analysis and visualisation)."
     ),
     x=0,
     y=-0.21,
@@ -1010,4 +1012,167 @@ fig.write_image(
 )
 
 fig.show()
+# %%
+
+occurances = []
+total_sessions = 0
+unloadable_sessions = []
+for year in range(2018, 2026):
+    print(f"Working on year {year}...")
+    events = ff1.get_event_schedule(year)
+    events = events[events.EventFormat != "testing"]
+    for round_num in events.RoundNumber:
+        if events[events.RoundNumber == round_num].EventDate.values[
+            0
+        ] >= pd.Timestamp(datetime.datetime.now()):
+            print(f"Skipping {year}, {round_num} as it's in the future")
+            continue
+        for quali_type in ["Q", "SQ"]:
+            try:
+                session = ff1.get_session(year, round_num, quali_type)
+            except ValueError as e:
+                if "Session type 'SQ' does not exist for this event" in str(e):
+                    print(f"Skipping SQ for {year}, {round_num}...")
+                    continue
+                if "Cannot get testing event by round number!" in str(e):
+                    print(f"Skipping test event {year}, {round_num}...")
+                else:
+                    raise e
+            total_sessions += 1
+            session.load(telemetry=False, laps=True, weather=False)
+            try:
+                laps = session.laps[session.laps.IsAccurate].reset_index(
+                    drop=True
+                )
+            except ff1.core.DataNotLoadedError:
+                print(
+                    f"Skipping {year}, {round_num}, {quali_type} as data is "
+                    "missing"
+                )
+                unloadable_sessions.append([year, round_num, quali_type])
+
+            pole_driver = laps.loc[laps.LapTime.idxmin()].Driver
+
+            sector_times = []
+            for sector in range(1, 4):
+                sector_time = pd.DataFrame(
+                    laps.iloc[laps[f"Sector{sector}Time"].idxmin()]
+                ).T[["Driver", f"Sector{sector}Time"]]
+                sector_time.rename(
+                    columns={f"Sector{sector}Time": "Time (s)"}, inplace=True
+                )
+                sector_time["Time (s)"] = sector_time["Time (s)"].apply(
+                    lambda x: x.total_seconds()
+                )
+                sector_time.loc[:, "Sector"] = sector
+                sector_times.append(
+                    sector_time[["Sector", "Driver", "Time (s)"]]
+                )
+            sector_times = pd.concat(sector_times).reset_index(drop=True)
+
+            if pole_driver not in sector_times.Driver.unique():
+                print(f"Adding: {year}, {round_num}, {pole_driver}")
+                occurances.append(
+                    [
+                        year,
+                        events[
+                            events.RoundNumber == round_num
+                        ].EventName.values[0],
+                        pole_driver,
+                    ]
+                )
+
+# %%
+occurances_df = pd.DataFrame(
+    occurances, columns=["Year", "EventName", "Driver"]
+)
+
+occurances_df = (
+    occurances_df.groupby("Driver", as_index=False)["Year"]
+    .count()
+    .rename(columns={"Year": "Number of Occurances"})
+    .sort_values("Number of Occurances")
+)
+
+# %%
+fig = px.bar(
+    occurances_df,
+    x="Number of Occurances",
+    y="Driver",
+    template=hp_line_template,
+    color_discrete_sequence=["#C8102E"],
+    title="<b>Pole position drivers without setting a fastest sector time</b>",
+)
+
+fig.update_yaxes(
+    showgrid=False,
+)
+fig.update_xaxes(
+    showgrid=True,
+    gridcolor="lightgray",
+)
+fig.update_layout(yaxis_title=None, xaxis=dict(domain=[0.05, 1]))  # noqa: C408
+
+fig.add_annotation(
+    text=(
+        "Since 2018, 8 different drivers have obtained"
+        " pole position without setting a fastest sector time during their"
+        " pole lap (across<br>169 qualifying sessions, including sprints). VER "
+        "has done this 7 times, the most of all drivers during this"
+        " time period."
+    ),
+    xref="paper",
+    yref="paper",
+    align="left",
+    x=0,
+    y=1.14,  # Position the text
+    showarrow=False,
+    font=dict(size=10),  # noqa: C408
+)
+
+fig.add_annotation(
+    text=(
+        "Sources: F1 API/FastF1 v3.5.3 (collection), "
+        "Grid Graphs (visualisation)."
+    ),
+    x=0,
+    y=-0.21,
+    xref="paper",
+    yref="paper",
+    xanchor="left",
+    align="center",
+    showarrow=False,
+    font=dict(color="darkgrey", size=10),  # noqa: C408
+)
+
+fig.add_annotation(
+    text="High Confidence",
+    x=1,
+    y=-0.21,
+    xref="paper",
+    yref="paper",
+    xanchor="right",
+    showarrow=False,
+    font=dict(color="white", size=10),  # noqa: C408
+    bgcolor="#008000",
+    bordercolor="black",
+    borderpad=2,
+)
+
+output_height = 460
+output_width = 640
+fname_prefix = "no_fastest_sectors"
+fig.write_image(
+    f"../outputs/{fname_prefix}.svg",
+    height=output_height,
+    width=output_width,
+)
+fig.write_image(
+    f"../outputs/{fname_prefix}.png",
+    height=output_height,
+    width=output_width,
+)
+
+fig.show()
+
 # %%
