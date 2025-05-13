@@ -319,12 +319,12 @@ output_height = 460
 output_width = 640
 fname_prefix = f"{comparitor_driver.lower()}_speed_differences"
 fig.write_image(
-    f"outputs/{fname_prefix}.svg",
+    f"../outputs/{fname_prefix}.svg",
     height=output_height,
     width=output_width,
 )
 fig.write_image(
-    f"outputs/{fname_prefix}.png",
+    f"../outputs/{fname_prefix}.png",
     height=output_height,
     width=output_width,
 )
@@ -532,12 +532,12 @@ output_height = 460
 output_width = 640
 fname_prefix = f"{comparitor_driver.lower()}_time_differences"
 fig.write_image(
-    f"outputs/{fname_prefix}.svg",
+    f"../outputs/{fname_prefix}.svg",
     height=output_height,
     width=output_width,
 )
 fig.write_image(
-    f"outputs/{fname_prefix}.png",
+    f"../outputs/{fname_prefix}.png",
     height=output_height,
     width=output_width,
 )
@@ -569,6 +569,7 @@ track_angle = circuit_info.rotation / 180 * np.pi
 rotated_track = rotate(track, angle=track_angle)
 rotated_track = pd.DataFrame(rotated_track, columns=["X", "Y"])
 
+# %%
 fig = px.line(
     rotated_track,
     x="X",
@@ -674,17 +675,18 @@ output_height = 460
 output_width = 640
 fname_prefix = "miami_track_map"
 fig.write_image(
-    f"outputs/{fname_prefix}.svg",
+    f"../outputs/{fname_prefix}.svg",
     height=output_height,
     width=output_width,
 )
 fig.write_image(
-    f"outputs/{fname_prefix}.png",
+    f"../outputs/{fname_prefix}.png",
     height=output_height,
     width=output_width,
 )
 
 fig.show()
+
 # %%
 laps = session.laps
 
@@ -709,6 +711,196 @@ sector_times.loc[:, "Sector Description"] = [
     "T8 exit to T16 exit",
     "T16 exit to finish line",
 ]
+
+
+# %%
+def mark_sectors(idx: int) -> str:
+    """Highlight sectors."""
+    if idx < 103:
+        return 1
+    elif idx < 232:
+        return 2
+    else:
+        return 3
+
+
+rotated_track["sector"] = rotated_track.index.map(mark_sectors)
+sect_1_extension = rotated_track.iloc[[103]]
+sect_1_extension.index = [102]
+sect_1_extension.loc[:, "sector"] = 1
+
+sect_2_extension = rotated_track.iloc[[232]]
+sect_2_extension.index = [231]
+sect_2_extension.loc[:, "sector"] = 2
+
+sect_3_extension = rotated_track.iloc[[0]]
+sect_3_extension.index = [rotated_track.index.max() + 1]
+sect_3_extension.loc[:, "sector"] = 3
+
+plot_rotated_track = (
+    pd.concat(
+        [rotated_track, sect_1_extension, sect_2_extension, sect_3_extension]
+    )
+    .copy()
+    .sort_index()
+)
+
+fig = px.line(
+    plot_rotated_track,
+    x="X",
+    y="Y",
+    color="sector",
+    template=hp_line_template,
+    color_discrete_sequence=["#00174C", "#FF8000", "#0093DD"],
+    title="<b>Fastest sector times during SQ3</b>",
+)
+
+fig.update_layout(showlegend=False)
+fig.update_traces(line={"width": 5})
+fig.update_yaxes(visible=False, showgrid=False)
+fig.update_xaxes(visible=False, showgrid=False)
+
+offset_vector = [500, 0]  # offset length is chosen arbitrarily to 'look good'
+
+# Iterate over all corners.
+for _, corner in circuit_info.corners.iterrows():
+    # Create a string from corner number and letter
+    txt = f"{corner['Number']}{corner['Letter']}"
+
+    # Convert the angle from degrees to radian.
+    offset_angle = corner["Angle"] / 180 * np.pi
+
+    # Rotate the offset vector so that it points sideways from the track.
+    offset_x, offset_y = rotate(offset_vector, angle=offset_angle)
+
+    # Add the offset to the position of the corner
+    text_x = corner["X"] + offset_x
+    text_y = corner["Y"] + offset_y
+
+    # Rotate the text position equivalently to the rest of the track map
+    text_x, text_y = rotate([text_x, text_y], angle=track_angle)
+
+    # Rotate the center of the corner equivalently to the rest of the track map
+    track_x, track_y = rotate([corner["X"], corner["Y"]], angle=track_angle)
+
+    radius_x = 325
+    radius_y = 275
+    fig.add_shape(
+        type="circle",
+        x0=text_x - radius_x,
+        y0=text_y - radius_y,
+        xanchor="left",
+        yanchor="left",
+        x1=text_x + radius_x,
+        y1=text_y + radius_y,
+        line=dict(width=2, color="Black"),  # noqa: C408
+        fillcolor="#C8102E",
+    )
+    fig.add_annotation(
+        text=txt,
+        x=text_x,
+        y=text_y,
+        showarrow=False,
+        align="center",
+        font=dict(color="white", size=14),  # noqa: C408
+    )
+
+fig.add_annotation(
+    text=(
+        "VER, PIA, and, NOR each took a fastest sector time during SQ3 "
+        "but failed to take pole position."
+    ),
+    xref="paper",
+    yref="paper",
+    align="left",
+    x=0,
+    y=1.1,  # Position the text
+    showarrow=False,
+    font=dict(size=10),  # noqa: C408
+)
+
+fig.add_annotation(
+    text=(
+        f"<b>Sector 1</b><br>{sector_times.Driver.iloc[0]}: "
+        f"{sector_times['Time (s)'].iloc[0]:.3f}s"
+    ),
+    x=1800,
+    y=-2000,
+    align="center",
+    showarrow=False,
+    font=dict(color="#00174C", size=14),  # noqa: C408
+)
+
+fig.add_annotation(
+    text=(
+        f"<b>Sector 2</b><br>{sector_times.Driver.iloc[1]}: "
+        f"{sector_times['Time (s)'].iloc[1]:.3f}s"
+    ),
+    x=8600,
+    y=-4500,
+    align="center",
+    showarrow=False,
+    font=dict(color="#FF8000", size=14),  # noqa: C408
+)
+
+fig.add_annotation(
+    text=(
+        f"<b>Sector 3</b><br>{sector_times.Driver.iloc[2]}: "
+        f"{sector_times['Time (s)'].iloc[2]:.3f}s"
+    ),
+    x=3300,
+    y=1900,
+    align="center",
+    showarrow=False,
+    font=dict(color="#0093DD", size=14),  # noqa: C408
+)
+
+fig.add_annotation(
+    text=(
+        "Sources: F1 API/FastF1 v3.5.3 (collection), "
+        "Heuristic Pedals (analysis and visualisation)."
+    ),
+    x=0,
+    y=-0.1,
+    xref="paper",
+    yref="paper",
+    xanchor="left",
+    align="center",
+    showarrow=False,
+    font=dict(color="darkgrey", size=10),  # noqa: C408
+)
+
+fig.add_annotation(
+    text="High Confidence",
+    x=1,
+    y=-0.1,
+    xref="paper",
+    yref="paper",
+    xanchor="right",
+    showarrow=False,
+    font=dict(color="white", size=10),  # noqa: C408
+    bgcolor="#008000",
+    bordercolor="black",
+    borderpad=2,
+)
+
+fig.update_layout(margin=dict(l=40, r=40, t=70, b=60))  # noqa: C408
+
+output_height = 460
+output_width = 640
+fname_prefix = "miami_sector_map"
+fig.write_image(
+    f"../outputs/{fname_prefix}.svg",
+    height=output_height,
+    width=output_width,
+)
+fig.write_image(
+    f"../outputs/{fname_prefix}.png",
+    height=output_height,
+    width=output_width,
+)
+
+fig.show()
 
 # %%
 fig = go.Figure(
@@ -807,12 +999,12 @@ fig.add_annotation(
 
 fname_prefix = "fastest_sectors_table"
 fig.write_image(
-    f"outputs/{fname_prefix}.svg",
+    f"../outputs/{fname_prefix}.svg",
     height=output_height,
     width=output_width,
 )
 fig.write_image(
-    f"outputs/{fname_prefix}.png",
+    f"../outputs/{fname_prefix}.png",
     height=output_height,
     width=output_width,
 )
