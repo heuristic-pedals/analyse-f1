@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 from fastf1.logger import LoggingManager
 
 # %%
-LoggingManager().set_level(logging.WARN)
+LoggingManager().set_level(logging.ERROR)
 
 # %%
 POINTS = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
@@ -124,6 +124,33 @@ standings = (
     .sort_values("FastestLapPoints", ascending=False)
     .reset_index(drop=True)
 )
+
+# %%
+# calculate the number of occurances
+countback = (
+    results.groupby("Driver", as_index=False)["Position"]
+    .value_counts()
+    .rename(columns={"count": "PositionAchievements"})
+    .pivot(columns="Position", index="Driver", values="PositionAchievements")
+    .fillna(0)
+)
+# zfill to set valid sort order + make Driver col
+countback.columns = [
+    "Position" + str(col).zfill(2)
+    for col in countback.columns.get_level_values(0)
+]
+countback.reset_index(inplace=True)
+
+# merge countback and sort standing by points and countback occurances
+standings = standings.merge(countback, on="Driver")
+countback_columns = list(countback.columns)
+countback_columns.remove("Driver")
+standings.sort_values(
+    ["FastestLapPoints"] + sorted(countback_columns),
+    inplace=True,
+    ascending=False,
+)
+standings.reset_index(drop=True, inplace=True)
 
 # %%
 hp_template = go.layout.Template(
