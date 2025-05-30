@@ -3,6 +3,7 @@
 import argparse
 import datetime
 import logging
+import sys
 
 import fastf1 as ff1
 import numpy as np
@@ -11,9 +12,58 @@ from fastf1.logger import LoggingManager
 from plot import grid_plot
 
 
-def parse_args() -> argparse.Namespace:
-    """Parse the command line arguments."""
+class CLI:
+    """Handle the cli inputs."""
 
+    def __init__(self):
+        """Parse the command line arguments."""
+        parser = argparse.ArgumentParser(
+            description=(
+                "Build a F1 fastest lap championship standings for drivers and"
+                " constructors across a season."
+            )
+        )
+
+        # set the required arguments
+        required_args = [
+            {
+                "name": "year",
+                "help": (
+                    "The F1 season year. Must be >= 2018 and not in the "
+                    "future."
+                ),
+                "type": self.year,
+            }
+        ]
+        for arg in required_args:
+            parser.add_argument(
+                arg["name"], help=arg["help"], type=arg["type"]
+            )
+
+        # handle the optional args
+        optional_ags = [
+            {
+                "name": "--log-level",
+                "help": (
+                    "Logging level. Must be one of 'debug', 'info', 'warning',"
+                    " 'error', or 'critical'."
+                ),
+                "default": "info",
+                "type": self.log_level,
+            }
+        ]
+        for arg in optional_ags:
+            parser.add_argument(
+                arg["name"],
+                help=arg["help"],
+                type=arg["type"],
+                default=arg["default"],
+            )
+
+        # parse the arguments
+        self.args = parser.parse_args()
+
+    @staticmethod
     def year(x: str) -> int:
         """Validate the year CLI argument."""
         x = int(x)
@@ -27,27 +77,63 @@ def parse_args() -> argparse.Namespace:
             )
         return x
 
-    parser = argparse.ArgumentParser(
-        description=(
-            "Build a F1 fastest lap championship standings for drivers and "
-            "constructors across a season."
-        )
+    @staticmethod
+    def log_level(x: str) -> int:
+        """Validate the log level argument."""
+        match x:
+            case "debug":
+                return logging.DEBUG
+            case "info":
+                return logging.INFO
+            case "warning":
+                return logging.WARNING
+            case "error":
+                return logging.ERROR
+            case "critical":
+                return logging.CRITICAL
+            case _:
+                raise argparse.ArgumentTypeError(
+                    f"Invalid log_level value, got {x}. Must be one of "
+                    "'debug', 'info', 'warning', 'error', or 'critical'."
+                )
+
+
+def setup_logger(
+    logger_name: str,
+    level: int = logging.INFO,
+) -> logging.Logger:
+    """Build a logger instance.
+
+    Parameters
+    ----------
+    logger_name : str
+        name of logger.
+    level : int, optional
+        logger level (e.g., logging.DEBUG, logging.WARNING etc.), by default
+        logging.INFO.
+
+    Returns
+    -------
+    logging.Logger
+        a logger instance with the requested properties.
+
+    """
+    # set up the logger and logging level
+    logger = logging.getLogger(logger_name)
+    logger.setLevel(level)
+
+    # fix the logger format
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
-    # set the required arguments
-    required_args = [
-        {
-            "name": "year",
-            "help": (
-                "The F1 season year. Must be >= 2018 and not in the future."
-            ),
-            "type": year,
-        }
-    ]
-    for arg in required_args:
-        parser.add_argument(arg["name"], help=arg["help"], type=arg["type"])
+    # set up a stream handler
+    sh = logging.StreamHandler(sys.stdout)
+    sh.setFormatter(formatter)
+    logger.handlers.clear()
+    logger.addHandler(sh)
 
-    return parser.parse_args()
+    return logger
 
 
 def mode(x):
@@ -78,17 +164,18 @@ def main(args: argparse.Namespace) -> None:
     events = ff1.get_event_schedule(args.year, include_testing=False)
     results = []  # store race results
     num_races = 0  # number of races complete record
+    logger = setup_logger("analyse-f1-fastest-lap-standings", args.log_level)
     for race_num in events.RoundNumber:
         # get the session and check that it's run
         session = ff1.get_session(args.year, race_num, "R")
         if session.event.EventDate > datetime.datetime.now():
-            print(
-                f"INFO: Skipping {session.event.EventName} as it's not "
-                "happened yet."
+            logger.debug(
+                f"Skipping {session.event.EventName} as it's not happened yet."
             )
             continue
 
         # get the session laps
+        logger.debug(f"Working on {session.event.EventName}...")
         session.load(telemetry=False, laps=True, weather=False)
         laps = session.laps
 
@@ -167,6 +254,10 @@ def main(args: argparse.Namespace) -> None:
         last_race = session.event.EventName
         last_race_date = session.event.EventDate.strftime("%Y-%m-%d")
         num_races += 1
+        logger.debug(
+            f"{session.event.EventName} complete. P1: "
+            f"{fastest_laps.iloc[0].Driver}"
+        )
 
         results.append(fastest_laps)
 
@@ -244,15 +335,15 @@ def main(args: argparse.Namespace) -> None:
             f"{last_race_date}).",
         )
         output_path = (
-            f"./outputs/{args.year}_{plot_type}_fastest_laps_standings_{num_races}"
-            "_rounds.png"
+            f"./outputs/{args.year}_{plot_type}_fastest_laps_standings_"
+            f"{num_races}_rounds.png"
         )
         fig.write_image(output_path)
-        print(
+        logger.info(
             f"{args.year} {plot_type} fastest lap plot saved to: {output_path}"
         )
 
 
 if __name__ == "__main__":
     # calculate fastest laps standings
-    main(parse_args())
+    main(CLI().args)
