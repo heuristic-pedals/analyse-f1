@@ -63,7 +63,7 @@ def _hp_grid_plot_template(
             margin={"l": 20, "r": 20, "t": 70, "b": 40},
             # title configuration
             title={
-                "x": 0.07,
+                "x": 0.069,
                 "xref": "container",
                 "y": title_y,
                 "yref": "container",
@@ -171,6 +171,10 @@ def grid_plot(
         case GridPlotType.CONSTRUCTORS.value:
             subtitle_y_offset = 1.035
             name_col = "TeamName"
+            # shorten team names for visualisation purposes only
+            standings[name_col] = standings[name_col].str.replace(
+                r"Racing|F1 Team", "", regex=True
+            )
         case _:
             raise ValueError(
                 f"Invalid `grid_plot_type`: {grid_plot_type}. Must be one of"
