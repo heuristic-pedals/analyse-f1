@@ -288,9 +288,9 @@ def main(args: argparse.Namespace) -> None:
         .reset_index(drop=True)
     )
 
-    for name_col, standings in (
-        ("Driver", drivers_standings),
-        ("TeamName", constructors_standings),
+    for name_col, plot_type, standings in (
+        ("Driver", "drivers", drivers_standings),
+        ("TeamName", "constructors", constructors_standings),
     ):
         countback = (
             results.groupby(name_col, as_index=False)["Position"]
@@ -314,18 +314,13 @@ def main(args: argparse.Namespace) -> None:
         standings = standings.merge(countback, on=name_col)
         countback_columns = list(countback.columns)
         countback_columns.remove(name_col)
-        standings.sort_values(
+        standings = standings.sort_values(
             ["FastestLapPoints"] + sorted(countback_columns),
-            inplace=True,
             ascending=False,
         )
-        standings.reset_index(drop=True, inplace=True)
+        standings = standings.reset_index(drop=True)
 
-    # plot standings
-    for plot_type, standings in (
-        ("drivers", drivers_standings),
-        ("constructors", constructors_standings),
-    ):
+        # plot standings
         fig = grid_plot(
             standings,
             plot_type,
