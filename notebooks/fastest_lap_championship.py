@@ -205,9 +205,15 @@ def main(args: argparse.Namespace) -> None:
             valid_laps["LapTimeS"],
             rtol=1e-03,
         )
-        valid_laps = valid_laps[valid_laps.IsValidSectors].reset_index(
-            drop=True
-        )
+        # note: don't need to subset to valid sectors only. QA-ed all fastest
+        # lap times going back several years and matches official results
+        # without this. Adding it in sometime removes the fastest lap when
+        # the sectors don't add up - i.e. issue with sector times and not
+        # lap time
+        # valid_laps = valid_laps[valid_laps.IsValidSectors].reset_index(
+        #     drop=True
+        # )
+        valid_laps = valid_laps.reset_index(drop=True)
 
         # calculate the fastest laps by driver
         fastest_laps = (
