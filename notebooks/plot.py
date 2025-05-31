@@ -173,7 +173,7 @@ def grid_plot(
             name_col = "TeamName"
             # shorten team names for visualisation purposes only
             standings[name_col] = standings[name_col].str.replace(
-                r"Racing|F1 Team", "", regex=True
+                r"Racing$|F1 Team$", "", regex=True
             )
         case _:
             raise ValueError(
@@ -325,9 +325,23 @@ def grid_plot(
             if grid_plot_type == GridPlotType.DRIVERS.value
             else place[name_col]
         )
+        # correct team colour if it is missing
+        team_color = f"#{place['TeamColor']}"
+        if team_color.lower() == "#ffffff":
+            if "Haas" in place["TeamName"]:
+                team_color = "#A9A9A9"  # 2021 Haas
+            elif "AlphaTauri" in place["TeamName"]:
+                team_color = "#C8C8C8"  # 2020 Alpha Tauri
+            elif "Williams" in place["TeamName"]:
+                team_color = "#00A0DE"  # 2019 Williams
+            else:
+                raise ValueError(
+                    f"{place['TeamName']} got {team_color} but have no "
+                    "information to correct for plotting on white backaground."
+                )
         fig.add_annotation(
             text=place_name,
-            font={"size": MED_FONT, "color": f"#{place['TeamColor']}"},
+            font={"size": MED_FONT, "color": team_color},
             x=name_x,
             y=text_y,
             xanchor="left",
